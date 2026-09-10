@@ -4,7 +4,7 @@
  * apiClient.js
  * ------------------------------------------------------------------
  * Thin API wrappers for DexScreener, Birdeye, Solana RPC, and RugCheck.
- * Silenced completely to keep Railway logs free of 410/429 noise.
+ * Configured with proper auth headers and silent fallback controls.
  * ------------------------------------------------------------------
  */
 
@@ -135,10 +135,14 @@ async function getSolanaAccountInfoParsed(address, rpcUrl) {
   });
 }
 
-async function getRugCheckReport(tokenAddress) {
+async function getRugCheckReport(tokenAddress, apiKey) {
   return await withSilentRetry(async () => {
     const url = `https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`;
-    const res = await fetchWithTimeout(url);
+    const headers = {};
+    if (apiKey) {
+      headers["X-API-KEY"] = apiKey; // Supports optional custom or free-tier keys safely
+    }
+    const res = await fetchWithTimeout(url, { headers });
     if (!res.ok) return null;
     return await res.json();
   });
