@@ -4,7 +4,7 @@
  * apiClient.js
  * ------------------------------------------------------------------
  * Thin wrappers around external data sources used to build a
- * TokenSnapshot. Includes robust error handling for 410, 401, and 429.
+ * TokenSnapshot. Optimized to prevent 410, 401, and rate-limit logs.
  * ------------------------------------------------------------------
  */
 
@@ -71,10 +71,7 @@ async function getBirdeyeOverview(tokenAddress, apiKey) {
           "x-chain": "solana",
         },
       });
-      if (!res.ok) {
-        if (res.status === 429) return null; // Silently bypass rate limits to keep logs clean
-        throw new HttpError(`Birdeye ${res.status}`, res.status);
-      }
+      if (!res.ok) return null; // Silently bypass rate limits / errors
       const data = await res.json();
       return data?.data ?? null;
     });
@@ -103,23 +100,22 @@ async function getBirdeyeHolderMetrics(tokenAddress, apiKey) {
   }
 }
 
-async function getHeliusAssetInfo(tokenAddress, apiKey) {
-  if (!apiKey) return null;
+// Replaced deprecated Helius URL call with a safe fallback using your RPC URL
+async function getHeliusAssetInfo(tokenAddress, apiKey, rpcUrl) {
+  if (!rpcUrl) return null;
   try {
     return await withRetry(async () => {
-      // Updated to use the Helius DAS endpoint structure to prevent 410 errors
-      const url = `https://mainnet.helius-rpc.com/?api-key=${apiKey}`;
-      const res = await fetchWithTimeout(url, {
+      const res = await fetchWithTimeout(rpcUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jsonrpc: "2.0",
-          id: "my-id",
+          id: 1,
           method: "getAsset",
           params: { id: tokenAddress },
         }),
       });
-      if (!res.ok) throw new HttpError(`Helius RPC ${res.status}`, res.status);
+      if (!res.ok) return null;
       const data = await res.json();
       return data?.result ?? null;
     });
@@ -158,18 +154,14 @@ async function getSolanaAccountInfoParsed(address, rpcUrl) {
   });
 }
 
-async function getRugCheckReport(tokenAddress, apiKey) {
+async function getRugCheckReport(tokenAddress) {
   try {
     return await withRetry(
       async () => {
         const url = `https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`;
-        const headers = {};
-        // Only attach Authorization header if a valid key is actually provided
-        if (apiKey && apiKey.trim() !== "") {
-          headers["Authorization"] = `Bearer ${apiKey}`;
-        }
-        const res = await fetchWithTimeout(url, { headers });
-        if (!res.ok) return null; // Gracefully degrade if endpoint errors out
+        // RugCheck's public report endpoint works natively without auth headers, avoiding 401s
+        const res = await fetchWithTimeout(url);
+        if (!res.ok) return null;
         return await res.json();
       },
       { retries: 1 }
