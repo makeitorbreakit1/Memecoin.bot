@@ -107,16 +107,13 @@ class Watchlist {
           }
         }
 
-        // Liquidity must be confirmed (a live, non-null liquidity reading) —
-        // a token with no resolvable liquidity figure is not eligible for
-        // an alert regardless of score.
+        // Liquidity must be confirmed (a live, non-null liquidity reading)
         if (snapshot.liquidityUsd == null) return;
 
         const result = scoreToken(snapshot);
         if (result.score < this.minScore) return;
 
-        // Verification confidence floor — anything below this is filtered
-        // out of automatic call-outs, even if the score itself is high.
+        // Verification confidence floor — filters out anything below 58% confidence
         if (result.verificationConfidencePct < this.minVerificationConfidencePct) return;
 
         let rugAssessment;
@@ -131,6 +128,11 @@ class Watchlist {
             unresolvedNotes: ["rug check threw an error"],
             dataCoveragePct: 0,
           };
+        }
+
+        // Safety gate: skip tokens flagged with a high rug pull probability (> 65%) so your channel isn't spamming honeypots
+        if (rugAssessment.rugProbabilityPct != null && rugAssessment.rugProbabilityPct > 65) {
+          return;
         }
 
         this.alertedMints.add(address);
