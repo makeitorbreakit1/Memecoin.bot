@@ -4,7 +4,8 @@
  * snapshotBuilder.js
  * ------------------------------------------------------------------
  * Merges DexScreener, Birdeye, Helius RPC, and RugCheck responses 
- * into a normalized TokenSnapshot covering all 12 tracked metrics.
+ * into a normalized TokenSnapshot covering all 12 tracked metrics 
+ * with robust null fallback protection.
  * ------------------------------------------------------------------
  */
 
