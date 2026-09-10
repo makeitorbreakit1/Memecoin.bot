@@ -3,8 +3,8 @@
 /**
  * snapshotBuilder.js
  * ------------------------------------------------------------------
- * Merges DexScreener, Birdeye, Helius, and RugCheck responses into one
- * normalized TokenSnapshot object covering all 12 tracked metrics.
+ * Merges DexScreener, Birdeye, Helius RPC, and RugCheck responses 
+ * into a normalized TokenSnapshot covering all 12 tracked metrics.
  * ------------------------------------------------------------------
  */
 
@@ -53,8 +53,8 @@ async function buildSnapshot(tokenAddress, keys = {}) {
     getDexScreenerPairs(tokenAddress).catch(() => []),
     getBirdeyeOverview(tokenAddress, keys.birdeyeApiKey),
     getBirdeyeHolderMetrics(tokenAddress, keys.birdeyeApiKey).catch(() => null),
-    getHeliusAssetInfo(tokenAddress, keys.heliusApiKey),
-    getRugCheckReport(tokenAddress, keys.rugcheckApiKey).catch(() => null),
+    getHeliusAssetInfo(tokenAddress, keys.heliusApiKey, keys.rpcUrl).catch(() => null),
+    getRugCheckReport(tokenAddress).catch(() => null),
   ]);
 
   const pair = pickBestPair(pairs);
@@ -66,8 +66,8 @@ async function buildSnapshot(tokenAddress, keys = {}) {
 
   const snapshot = {
     tokenAddress,
-    name: pair?.baseToken?.name ?? helius?.onChainMetadata?.metadata?.data?.name ?? null,
-    symbol: pair?.baseToken?.symbol ?? helius?.onChainMetadata?.metadata?.data?.symbol ?? null,
+    name: pair?.baseToken?.name ?? helius?.content?.metadata?.name ?? null,
+    symbol: pair?.baseToken?.symbol ?? helius?.content?.metadata?.symbol ?? null,
     dexUrl: pair?.url ?? null,
     priceUsd: pair?.priceUsd ? Number(pair.priceUsd) : null,
 
