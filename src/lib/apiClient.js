@@ -3,8 +3,8 @@
 /**
  * apiClient.js
  * ------------------------------------------------------------------
- * Thin wrappers around external data sources used to build a
- * TokenSnapshot. Optimized to prevent 410, 401, and rate-limit logs.
+ * Thin API wrappers for DexScreener, Birdeye, Solana RPC, and RugCheck.
+ * Configured with silent fallback controls to keep logs completely clean.
  * ------------------------------------------------------------------
  */
 
@@ -71,7 +71,7 @@ async function getBirdeyeOverview(tokenAddress, apiKey) {
           "x-chain": "solana",
         },
       });
-      if (!res.ok) return null; // Silently bypass rate limits / errors
+      if (!res.ok) return null; // Silently swallow 429/4xx errors to maintain clean logs
       const data = await res.json();
       return data?.data ?? null;
     });
@@ -100,7 +100,6 @@ async function getBirdeyeHolderMetrics(tokenAddress, apiKey) {
   }
 }
 
-// Replaced deprecated Helius URL call with a safe fallback using your RPC URL
 async function getHeliusAssetInfo(tokenAddress, apiKey, rpcUrl) {
   if (!rpcUrl) return null;
   try {
@@ -159,7 +158,6 @@ async function getRugCheckReport(tokenAddress) {
     return await withRetry(
       async () => {
         const url = `https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`;
-        // RugCheck's public report endpoint works natively without auth headers, avoiding 401s
         const res = await fetchWithTimeout(url);
         if (!res.ok) return null;
         return await res.json();
