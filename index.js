@@ -25,8 +25,12 @@ const {
   POLL_INTERVAL_MS = "30000",
   MIN_TOKEN_AGE_SECONDS = "60",
   MAX_TOKEN_AGE_SECONDS = "21600",
-  MIN_SCORE_TO_ALERT = "55",
-  MIN_VERIFICATION_CONFIDENCE_PCT = "58",
+  MIN_SCORE_TO_ALERT = "70",
+  MIN_VERIFICATION_CONFIDENCE_PCT = "80",
+  MAX_RUG_PROBABILITY_PCT = "35",
+  REQUIRE_RUGCHECK = "true",
+  REQUIRE_AUTHORITY_DATA = "true",
+  MIN_LIQUIDITY_USD = "10000",
 } = process.env;
 
 const REQUIRED_VARS = ["DISCORD_TOKEN", "CHANNEL_ID"];
@@ -94,6 +98,10 @@ client.once(Events.ClientReady, async (c) => {
     maxAgeSeconds: Number(MAX_TOKEN_AGE_SECONDS),
     minScore: Number(MIN_SCORE_TO_ALERT),
     minVerificationConfidencePct: Number(MIN_VERIFICATION_CONFIDENCE_PCT),
+    maxRugProbabilityPct: Number(MAX_RUG_PROBABILITY_PCT),
+    requireRugCheck: String(REQUIRE_RUGCHECK).toLowerCase() === "true",
+    requireAuthorityData: String(REQUIRE_AUTHORITY_DATA).toLowerCase() === "true",
+    minLiquidityUsd: Number(MIN_LIQUIDITY_USD),
     birdeyeApiKey: BIRDEYE_API_KEY,
     heliusApiKey: HELIUS_API_KEY,
     rpcUrl: RPC_URL || (HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}` : null),
