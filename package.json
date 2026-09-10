@@ -1,16 +1,12 @@
 {
-  "name": "memecoin-radar-bot",
+  "name": "solana-tracker-bot",
   "version": "1.0.0",
-  "description": "Discord bot that monitors newly launched memecoins, scores them with a rule-based engine, and posts formatted radar alerts.",
-  "main": "src/index.js",
-  "type": "commonjs",
+  "description": "Robust Solana memecoin tracker bot on Railway with 12-field metric coverage",
+  "main": "index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.16.3",
-    "dotenv": "^16.4.5",
     "node-fetch": "^2.7.0",
     "p-limit": "^3.1.0"
   },
