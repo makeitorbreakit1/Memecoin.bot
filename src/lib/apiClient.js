@@ -140,10 +140,76 @@ async function discoverNewTokens({ chainId = "solana" } = {}) {
   });
 }
 
+/**
+ * Raw Solana JSON-RPC call: getAccountInfo with jsonParsed encoding.
+ * Used by rugChecker.js to read an SPL token mint's `mintAuthority`
+ * and `freezeAuthority` directly from the chain — this is a
+ * deterministic fact, not a heuristic (either the authority pubkey
+ * is present or it's `null`/renounced).
+ *
+ * Works against any standard Solana RPC endpoint (public mainnet-beta,
+ * Helius RPC, QuickNode, etc.) — pass the URL in via `rpcUrl`.
+ */
+async function getSolanaAccountInfoParsed(address, rpcUrl) {
+  return withRetry(async () => {
+    const res = await fetchWithTimeout(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getAccountInfo",
+        params: [address, { encoding: "jsonParsed" }],
+      }),
+    });
+    if (!res.ok) throw new HttpError(`Solana RPC ${res.status}`, res.status);
+    const data = await res.json();
+    if (data?.error) throw new HttpError(`Solana RPC error: ${data.error.message}`, 500);
+    return data?.result?.value ?? null;
+  });
+}
+
+/**
+ * RugCheck.xyz public report for a Solana token — covers LP lock/burn
+ * status and holder-concentration analysis that would otherwise
+ * require building our own wallet-clustering indexer. This is a
+ * third-party dependency: if it's down, slow, or its response shape
+ * has changed since this was written, we degrade to `null` rather
+ * than guessing at fields.
+ *
+ * NOTE: the exact response schema below (`risks[]`, `rugged`,
+ * `markets[].lp.lpLockedPct`) reflects RugCheck's public API as
+ * documented at the time this was written. Verify against
+ * https://api.rugcheck.xyz's current docs if fields stop resolving —
+ * rugChecker.js already treats any missing/unexpected field as
+ * "unavailable" rather than crashing, so a schema drift will show up
+ * as reduced confidence, not a wrong answer.
+ */
+async function getRugCheckReport(tokenAddress, apiKey) {
+  try {
+    return await withRetry(
+      async () => {
+        const url = `https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`;
+        const res = await fetchWithTimeout(url, {
+          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+        });
+        if (!res.ok) throw new HttpError(`RugCheck ${res.status}`, res.status);
+        return await res.json();
+      },
+      { retries: 1 }
+    );
+  } catch (err) {
+    console.warn(`[apiClient] RugCheck report failed for ${tokenAddress}: ${err.message}`);
+    return null;
+  }
+}
+
 module.exports = {
   getDexScreenerPairs,
   getBirdeyeOverview,
   getHeliusAssetInfo,
   discoverNewTokens,
+  getSolanaAccountInfoParsed,
+  getRugCheckReport,
   HttpError,
 };

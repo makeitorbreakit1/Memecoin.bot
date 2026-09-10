@@ -29,11 +29,14 @@ const {
   CHANNEL_ID,
   BIRDEYE_API_KEY,
   HELIUS_API_KEY,
+  RPC_URL,
+  RUGCHECK_API_KEY,
   PING_ROLE_ID,
   POLL_INTERVAL_MS = "30000",
   MIN_TOKEN_AGE_SECONDS = "60",
   MAX_TOKEN_AGE_SECONDS = "21600",
   MIN_SCORE_TO_ALERT = "55",
+  MIN_VERIFICATION_CONFIDENCE_PCT = "58",
 } = process.env;
 
 const REQUIRED_VARS = ["DISCORD_TOKEN", "CHANNEL_ID"];
@@ -47,6 +50,12 @@ if (!BIRDEYE_API_KEY && !HELIUS_API_KEY) {
   console.warn(
     "[startup] No BIRDEYE_API_KEY or HELIUS_API_KEY set — running on DexScreener data only. " +
       "Some fields (holders, MC cross-check) will show as missing."
+  );
+}
+if (!RPC_URL) {
+  console.warn(
+    "[startup] No RPC_URL set — mint/freeze authority checks will be skipped, and rug " +
+      "risk will fall back to RugCheck.xyz alone (or show as Unknown if that's also unavailable)."
   );
 }
 
@@ -76,14 +85,14 @@ async function registerCommands() {
 
 let watchlist;
 
-async function postAlert(snapshot, result) {
+async function postAlert(snapshot, result, rugAssessment) {
   const channel = await client.channels.fetch(CHANNEL_ID).catch((err) => {
     console.error("[postAlert] Failed to fetch channel:", err.message);
     return null;
   });
   if (!channel) return;
 
-  const embed = buildRadarEmbed(snapshot, result);
+  const embed = buildRadarEmbed(snapshot, result, rugAssessment);
   const content =
     result.score >= 70 && PING_ROLE_ID ? `<@&${PING_ROLE_ID}>` : undefined;
 
@@ -100,8 +109,11 @@ client.once(Events.ClientReady, async (c) => {
     minAgeSeconds: Number(MIN_TOKEN_AGE_SECONDS),
     maxAgeSeconds: Number(MAX_TOKEN_AGE_SECONDS),
     minScore: Number(MIN_SCORE_TO_ALERT),
+    minVerificationConfidencePct: Number(MIN_VERIFICATION_CONFIDENCE_PCT),
     birdeyeApiKey: BIRDEYE_API_KEY,
     heliusApiKey: HELIUS_API_KEY,
+    rpcUrl: RPC_URL,
+    rugcheckApiKey: RUGCHECK_API_KEY,
     onAlert: postAlert,
     onError: (err, ctx) => console.error(`[watchlist:${ctx}]`, err.message),
   });
@@ -135,7 +147,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  const embed = buildRadarEmbed(evaluation.snapshot, evaluation.result);
+  const embed = buildRadarEmbed(evaluation.snapshot, evaluation.result, evaluation.rugAssessment);
   await interaction.editReply({ embeds: [embed] });
 });
 

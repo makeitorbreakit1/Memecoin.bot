@@ -51,12 +51,20 @@ function scoreLabel(score) {
   return "Weak";
 }
 
+function rugRiskEmoji(riskLevel) {
+  if (riskLevel === "High") return "🔴";
+  if (riskLevel === "Moderate") return "🟠";
+  if (riskLevel === "Low") return "🟢";
+  return "⚪"; // Unknown
+}
+
 /**
  * Build the Discord embed for a scored token.
  * @param {object} snapshot - TokenSnapshot
  * @param {object} result - ScoreResult from scoreToken()
+ * @param {object} [rugAssessment] - RugAssessment from rugChecker.assessRugRisk(), if available
  */
-function buildRadarEmbed(snapshot, result) {
+function buildRadarEmbed(snapshot, result, rugAssessment) {
   const title = snapshot.symbol
     ? `🛰 Radar hit — $${snapshot.symbol}`
     : "🛰 Radar hit — unknown symbol";
@@ -112,11 +120,34 @@ function buildRadarEmbed(snapshot, result) {
       { name: "Flow", value: flow, inline: true },
       { name: "Why radar fired", value: whyFired, inline: false },
       { name: "Verification confidence", value: verification, inline: false }
-    )
+    );
+
+  if (rugAssessment) {
+    const probabilityLine =
+      rugAssessment.rugProbabilityPct != null
+        ? `**Probability:** ${rugAssessment.rugProbabilityPct}% (${rugAssessment.riskLevel})`
+        : `**Probability:** Unknown — insufficient data`;
+
+    const flagsLine = rugAssessment.flags.map((f) => `• ${f}`).join("\n");
+
+    const unresolvedLine =
+      rugAssessment.unresolvedNotes && rugAssessment.unresolvedNotes.length > 0
+        ? `\n**Not checked:** ${rugAssessment.unresolvedNotes.join("; ")}`
+        : "";
+
+    embed.addFields({
+      name: `${rugRiskEmoji(rugAssessment.riskLevel)} Rug pull risk`,
+      value: `${probabilityLine}\n${flagsLine}${unresolvedLine}`,
+      inline: false,
+    });
+  }
+
+  embed
     .setFooter({
       text:
         "Unofficial automated screen — not financial advice. Missing API data does not " +
-        "hide a runner, and it does not confirm legitimacy either. DYOR.",
+        "hide a runner, and it does not confirm legitimacy either. Rug risk is a heuristic " +
+        "estimate, not a guarantee of safety. DYOR.",
     })
     .setTimestamp(new Date());
 
