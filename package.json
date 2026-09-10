@@ -1,16 +1,14 @@
 {
   "name": "solana-tracker-bot",
-  "version": "1.0.0",
-  "description": "Robust Solana memecoin tracker bot on Railway with 12-field metric coverage",
+  "version": "2.0.0",
+  "description": "Robust Solana memecoin radar bot for Discord/Railway with 12-field market, activity and safety coverage",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
+  "scripts": { "start": "node index.js" },
   "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
     "node-fetch": "^2.7.0",
     "p-limit": "^3.1.0"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "engines": { "node": ">=18.0.0" }
 }
