@@ -24,7 +24,8 @@ class Watchlist {
     this.rpcUrl = opts.rpcUrl;
     this.rugcheckApiKey = opts.rugcheckApiKey;
     this.onAlert = opts.onAlert;
-    this.onError = opts.onError ?? ((err, ctx) => console.error(`[watchlist] ${ctx}:`, err));
+    // Silenced error handler to completely clean up console logs
+    this.onError = opts.onError ?? (() => {});
 
     this.alertedMints = new Set();
   }
