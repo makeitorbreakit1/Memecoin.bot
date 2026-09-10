@@ -5,11 +5,7 @@
  * ------------------------------------------------------------------
  * Orchestrates the poll loop: discover candidate tokens -> build
  * snapshots -> score -> assess rug risk -> emit alerts for anything
- * crossing the score/confidence thresholds that hasn't already been
- * alerted. Keeps a small in-memory dedupe set so restarting the
- * process is the only way to re-alert on the same mint (fine for a
- * lightweight bot; swap for Redis/sqlite if you need persistence
- * across restarts).
+ * crossing the strict score/confidence/rug thresholds.
  * ------------------------------------------------------------------
  */
 
@@ -20,19 +16,6 @@ const { scoreToken } = require("./scoringEngine");
 const { fetchMintAuthorityStatus, assessRugRisk } = require("./rugChecker");
 
 class Watchlist {
-  /**
-   * @param {object} opts
-   * @param {number} opts.minAgeSeconds
-   * @param {number} opts.maxAgeSeconds
-   * @param {number} opts.minScore
-   * @param {number} [opts.minVerificationConfidencePct] - alerts below this Verification confidence % are filtered out (default 58)
-   * @param {string} [opts.birdeyeApiKey]
-   * @param {string} [opts.heliusApiKey]
-   * @param {string} [opts.rpcUrl] - Solana RPC endpoint used for mint/freeze authority checks
-   * @param {string} [opts.rugcheckApiKey] - optional RugCheck.xyz API key
-   * @param {(snapshot: object, result: object, rugAssessment: object) => Promise<void>} opts.onAlert
-   * @param {(err: Error, context: string) => void} [opts.onError]
-   */
   constructor(opts) {
     this.minAgeSeconds = opts.minAgeSeconds;
     this.maxAgeSeconds = opts.maxAgeSeconds;
@@ -46,10 +29,9 @@ class Watchlist {
     this.onError = opts.onError ?? ((err, ctx) => console.error(`[watchlist] ${ctx}:`, err));
 
     this.alertedMints = new Set();
-    this.limit = pLimit(5); // cap concurrent snapshot builds to be API-friendly
+    this.limit = pLimit(5);
   }
 
-  /** Run the mint-authority + RugCheck lookups for one address and combine into a RugAssessment. */
   async _assessRug(address, snapshot, liqMcPct) {
     const [mintAuthorityStatus, rugCheckReport] = await Promise.all([
       fetchMintAuthorityStatus(address, this.rpcUrl),
@@ -58,12 +40,12 @@ class Watchlist {
     return assessRugRisk({ snapshot, liqMcPct, mintAuthorityStatus, rugCheckReport });
   }
 
-  /** Manually queue a specific token address for evaluation (e.g. from a Discord command). */
   async evaluateOne(tokenAddress) {
     try {
       const snapshot = await buildSnapshot(tokenAddress, {
         birdeyeApiKey: this.birdeyeApiKey,
         heliusApiKey: this.heliusApiKey,
+        rugcheckApiKey: this.rugcheckApiKey,
       });
       const result = scoreToken(snapshot);
       const rugAssessment = await this._assessRug(tokenAddress, snapshot, result.liqMcPct);
@@ -92,6 +74,7 @@ class Watchlist {
           snapshot = await buildSnapshot(address, {
             birdeyeApiKey: this.birdeyeApiKey,
             heliusApiKey: this.heliusApiKey,
+            rugcheckApiKey: this.rugcheckApiKey,
           });
         } catch (err) {
           this.onError(err, `buildSnapshot(${address})`);
@@ -103,17 +86,16 @@ class Watchlist {
             snapshot.tokenAgeSeconds < this.minAgeSeconds ||
             snapshot.tokenAgeSeconds > this.maxAgeSeconds
           ) {
-            return; // outside the "freshly launched" window
+            return;
           }
         }
 
-        // Liquidity must be confirmed (a live, non-null liquidity reading)
         if (snapshot.liquidityUsd == null) return;
 
         const result = scoreToken(snapshot);
         if (result.score < this.minScore) return;
 
-        // Verification confidence floor — filters out anything below 58% confidence
+        // STRICT GATE 1: Verification confidence floor must be >= 58%
         if (result.verificationConfidencePct < this.minVerificationConfidencePct) return;
 
         let rugAssessment;
@@ -121,17 +103,16 @@ class Watchlist {
           rugAssessment = await this._assessRug(address, snapshot, result.liqMcPct);
         } catch (err) {
           this.onError(err, `assessRug(${address})`);
-          rugAssessment = {
-            rugProbabilityPct: null,
-            riskLevel: "Unknown",
-            flags: ["Rug check failed to run"],
-            unresolvedNotes: ["rug check threw an error"],
-            dataCoveragePct: 0,
-          };
+          return;
         }
 
-        // Safety gate: skip tokens flagged with a high rug pull probability (> 65%) so your channel isn't spamming honeypots
-        if (rugAssessment.rugProbabilityPct != null && rugAssessment.rugProbabilityPct > 65) {
+        // STRICT GATE 2: Must have a successfully calculated numeric rug probability percentage
+        if (rugAssessment.rugProbabilityPct == null) {
+          return;
+        }
+
+        // STRICT GATE 3: Block tokens with high rug pull probability (> 65%)
+        if (rugAssessment.rugProbabilityPct > 65) {
           return;
         }
 
@@ -147,7 +128,6 @@ class Watchlist {
     await Promise.all(jobs);
   }
 
-  /** Start polling on an interval. Returns a stop() function. */
   start(intervalMs) {
     let stopped = false;
     const loop = async () => {
