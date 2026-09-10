@@ -1,3 +1,4 @@
+console.log("🚀 SOLANA TRACKER V4 - FREE SNIPER BUILD 2026-09-10");
 "use strict";
 
 require("dotenv").config();
@@ -28,9 +29,9 @@ const {
   MIN_SCORE_TO_ALERT = "70",
   MIN_VERIFICATION_CONFIDENCE_PCT = "80",
   MAX_RUG_PROBABILITY_PCT = "35",
+  MIN_LIQUIDITY_USD = "10000",
   REQUIRE_RUGCHECK = "true",
   REQUIRE_AUTHORITY_DATA = "true",
-  MIN_LIQUIDITY_USD = "10000",
 } = process.env;
 
 const REQUIRED_VARS = ["DISCORD_TOKEN", "CHANNEL_ID"];
@@ -74,14 +75,14 @@ async function registerCommands() {
 
 let watchlist;
 
-async function postAlert(snapshot, result, rugAssessment) {
+async function postAlert(snapshot, result, rugAssessment, earlySignal = null) {
   const channel = await client.channels.fetch(CHANNEL_ID).catch((err) => {
     console.error("[postAlert] Channel fetch failed:", err.message);
     return null;
   });
   if (!channel?.send) return;
 
-  const embed = buildRadarEmbed(snapshot, result, rugAssessment);
+  const embed = buildRadarEmbed(snapshot, result, rugAssessment, earlySignal);
   const content = result.score >= 70 && PING_ROLE_ID ? `<@&${PING_ROLE_ID}>` : undefined;
 
   await channel.send({ content, embeds: [embed] }).catch((err) => {
@@ -99,9 +100,9 @@ client.once(Events.ClientReady, async (c) => {
     minScore: Number(MIN_SCORE_TO_ALERT),
     minVerificationConfidencePct: Number(MIN_VERIFICATION_CONFIDENCE_PCT),
     maxRugProbabilityPct: Number(MAX_RUG_PROBABILITY_PCT),
-    requireRugCheck: String(REQUIRE_RUGCHECK).toLowerCase() === "true",
-    requireAuthorityData: String(REQUIRE_AUTHORITY_DATA).toLowerCase() === "true",
     minLiquidityUsd: Number(MIN_LIQUIDITY_USD),
+    requireRugCheck: REQUIRE_RUGCHECK.toLowerCase() === "true",
+    requireAuthorityData: REQUIRE_AUTHORITY_DATA.toLowerCase() === "true",
     birdeyeApiKey: BIRDEYE_API_KEY,
     heliusApiKey: HELIUS_API_KEY,
     rpcUrl: RPC_URL || (HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}` : null),
@@ -140,7 +141,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  const embed = buildRadarEmbed(evaluation.snapshot, evaluation.result, evaluation.rugAssessment);
+  const embed = buildRadarEmbed(evaluation.snapshot, evaluation.result, evaluation.rugAssessment, null);
   await interaction.editReply({ embeds: [embed] });
 });
 
