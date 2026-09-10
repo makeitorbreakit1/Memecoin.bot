@@ -4,7 +4,7 @@
  * apiClient.js
  * ------------------------------------------------------------------
  * Thin API wrappers for DexScreener, Birdeye, Solana RPC, and RugCheck.
- * Configured with silent fallback controls to keep logs completely clean.
+ * Silenced completely to keep Railway logs free of 410/429 noise.
  * ------------------------------------------------------------------
  */
 
@@ -26,21 +26,16 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_M
   }
 }
 
-async function withRetry(fn, { retries = 2, baseDelayMs = 500 } = {}) {
-  let lastErr;
+async function withSilentRetry(fn, { retries = 1, delayMs = 400 } = {}) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await fn();
     } catch (err) {
-      lastErr = err;
-      const isRateLimited = err?.status === 429;
-      const delay = baseDelayMs * Math.pow(2, attempt) + Math.floor(Math.random() * 200);
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, isRateLimited ? delay * 3 : delay));
-      }
+      if (attempt === retries) return null;
+      await new Promise((r) => setTimeout(r, delayMs));
     }
   }
-  throw lastErr;
+  return null;
 }
 
 class HttpError extends Error {
@@ -51,91 +46,79 @@ class HttpError extends Error {
 }
 
 async function getDexScreenerPairs(tokenAddress) {
-  return withRetry(async () => {
+  const data = await withSilentRetry(async () => {
     const url = `${DEXSCREENER_BASE}/tokens/${tokenAddress}`;
     const res = await fetchWithTimeout(url);
-    if (!res.ok) throw new HttpError(`DexScreener ${res.status}`, res.status);
-    const data = await res.json();
-    return Array.isArray(data?.pairs) ? data.pairs : [];
+    if (!res.ok) return null;
+    return await res.json();
   });
+  return Array.isArray(data?.pairs) ? data.pairs : [];
 }
 
 async function getBirdeyeOverview(tokenAddress, apiKey) {
   if (!apiKey) return null;
-  try {
-    return await withRetry(async () => {
-      const url = `${BIRDEYE_BASE}/defi/token_overview?address=${tokenAddress}`;
-      const res = await fetchWithTimeout(url, {
-        headers: {
-          "X-API-KEY": apiKey,
-          "x-chain": "solana",
-        },
-      });
-      if (!res.ok) return null; // Silently swallow 429/4xx errors to maintain clean logs
-      const data = await res.json();
-      return data?.data ?? null;
+  return await withSilentRetry(async () => {
+    const url = `${BIRDEYE_BASE}/defi/token_overview?address=${tokenAddress}`;
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        "X-API-KEY": apiKey,
+        "x-chain": "solana",
+      },
     });
-  } catch (err) {
-    return null;
-  }
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.data ?? null;
+  });
 }
 
 async function getBirdeyeHolderMetrics(tokenAddress, apiKey) {
   if (!apiKey) return null;
-  try {
-    return await withRetry(async () => {
-      const url = `${BIRDEYE_BASE}/defi/v3/token/holder-list?address=${tokenAddress}&limit=10`;
-      const res = await fetchWithTimeout(url, {
-        headers: {
-          "X-API-KEY": apiKey,
-          "x-chain": "solana",
-        },
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      return data?.data ?? null;
+  return await withSilentRetry(async () => {
+    const url = `${BIRDEYE_BASE}/defi/v3/token/holder-list?address=${tokenAddress}&limit=10`;
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        "X-API-KEY": apiKey,
+        "x-chain": "solana",
+      },
     });
-  } catch (err) {
-    return null;
-  }
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.data ?? null;
+  });
 }
 
 async function getHeliusAssetInfo(tokenAddress, apiKey, rpcUrl) {
   if (!rpcUrl) return null;
-  try {
-    return await withRetry(async () => {
-      const res = await fetchWithTimeout(rpcUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getAsset",
-          params: { id: tokenAddress },
-        }),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      return data?.result ?? null;
+  return await withSilentRetry(async () => {
+    const res = await fetchWithTimeout(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getAsset",
+        params: { id: tokenAddress },
+      }),
     });
-  } catch (err) {
-    return null;
-  }
-}
-
-async function discoverNewTokens({ chainId = "solana" } = {}) {
-  return withRetry(async () => {
-    const url = `https://api.dexscreener.com/token-profiles/latest/v1`;
-    const res = await fetchWithTimeout(url);
-    if (!res.ok) throw new HttpError(`DexScreener discovery ${res.status}`, res.status);
+    if (!res.ok) return null;
     const data = await res.json();
-    const list = Array.isArray(data) ? data : [];
-    return list.filter((t) => t.chainId === chainId).map((t) => t.tokenAddress);
+    return data?.result ?? null;
   });
 }
 
+async function discoverNewTokens({ chainId = "solana" } = {}) {
+  const data = await withSilentRetry(async () => {
+    const url = `https://api.dexscreener.com/token-profiles/latest/v1`;
+    const res = await fetchWithTimeout(url);
+    if (!res.ok) return null;
+    return await res.json();
+  });
+  const list = Array.isArray(data) ? data : [];
+  return list.filter((t) => t.chainId === chainId).map((t) => t.tokenAddress);
+}
+
 async function getSolanaAccountInfoParsed(address, rpcUrl) {
-  return withRetry(async () => {
+  return await withSilentRetry(async () => {
     const res = await fetchWithTimeout(rpcUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -146,27 +129,19 @@ async function getSolanaAccountInfoParsed(address, rpcUrl) {
         params: [address, { encoding: "jsonParsed" }],
       }),
     });
-    if (!res.ok) throw new HttpError(`Solana RPC ${res.status}`, res.status);
+    if (!res.ok) return null;
     const data = await res.json();
-    if (data?.error) throw new HttpError(`Solana RPC error: ${data.error.message}`, 500);
     return data?.result?.value ?? null;
   });
 }
 
 async function getRugCheckReport(tokenAddress) {
-  try {
-    return await withRetry(
-      async () => {
-        const url = `https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`;
-        const res = await fetchWithTimeout(url);
-        if (!res.ok) return null;
-        return await res.json();
-      },
-      { retries: 1 }
-    );
-  } catch (err) {
-    return null;
-  }
+  return await withSilentRetry(async () => {
+    const url = `https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`;
+    const res = await fetchWithTimeout(url);
+    if (!res.ok) return null;
+    return await res.json();
+  });
 }
 
 module.exports = {
