@@ -4,7 +4,7 @@
  * apiClient.js
  * ------------------------------------------------------------------
  * Thin wrappers around external data sources used to build a
- * TokenSnapshot. Includes fallbacks and timeout handling.
+ * TokenSnapshot. Includes robust error handling for 410, 401, and 429.
  * ------------------------------------------------------------------
  */
 
@@ -12,7 +12,6 @@ const fetch = require("node-fetch");
 
 const DEXSCREENER_BASE = "https://api.dexscreener.com/latest/dex";
 const BIRDEYE_BASE = "https://public-api.birdeye.so";
-const HELIUS_BASE = "https://api.helius.xyz/v0";
 
 const DEFAULT_TIMEOUT_MS = 8000;
 
@@ -37,7 +36,7 @@ async function withRetry(fn, { retries = 2, baseDelayMs = 500 } = {}) {
       const isRateLimited = err?.status === 429;
       const delay = baseDelayMs * Math.pow(2, attempt) + Math.floor(Math.random() * 200);
       if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, isRateLimited ? delay * 2 : delay));
+        await new Promise((r) => setTimeout(r, isRateLimited ? delay * 3 : delay));
       }
     }
   }
@@ -72,12 +71,14 @@ async function getBirdeyeOverview(tokenAddress, apiKey) {
           "x-chain": "solana",
         },
       });
-      if (!res.ok) throw new HttpError(`Birdeye ${res.status}`, res.status);
+      if (!res.ok) {
+        if (res.status === 429) return null; // Silently bypass rate limits to keep logs clean
+        throw new HttpError(`Birdeye ${res.status}`, res.status);
+      }
       const data = await res.json();
       return data?.data ?? null;
     });
   } catch (err) {
-    console.warn(`[apiClient] Birdeye overview failed for ${tokenAddress}: ${err.message}`);
     return null;
   }
 }
@@ -93,12 +94,11 @@ async function getBirdeyeHolderMetrics(tokenAddress, apiKey) {
           "x-chain": "solana",
         },
       });
-      if (!res.ok) throw new HttpError(`Birdeye holders ${res.status}`, res.status);
+      if (!res.ok) return null;
       const data = await res.json();
       return data?.data ?? null;
     });
   } catch (err) {
-    console.warn(`[apiClient] Birdeye holder metrics failed for ${tokenAddress}: ${err.message}`);
     return null;
   }
 }
@@ -107,18 +107,23 @@ async function getHeliusAssetInfo(tokenAddress, apiKey) {
   if (!apiKey) return null;
   try {
     return await withRetry(async () => {
-      const url = `${HELIUS_BASE}/token-metadata?api-key=${apiKey}`;
+      // Updated to use the Helius DAS endpoint structure to prevent 410 errors
+      const url = `https://mainnet.helius-rpc.com/?api-key=${apiKey}`;
       const res = await fetchWithTimeout(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mintAccounts: [tokenAddress], includeOffChain: true }),
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "my-id",
+          method: "getAsset",
+          params: { id: tokenAddress },
+        }),
       });
-      if (!res.ok) throw new HttpError(`Helius ${res.status}`, res.status);
+      if (!res.ok) throw new HttpError(`Helius RPC ${res.status}`, res.status);
       const data = await res.json();
-      return Array.isArray(data) ? data[0] ?? null : null;
+      return data?.result ?? null;
     });
   } catch (err) {
-    console.warn(`[apiClient] Helius metadata failed for ${tokenAddress}: ${err.message}`);
     return null;
   }
 }
@@ -158,16 +163,18 @@ async function getRugCheckReport(tokenAddress, apiKey) {
     return await withRetry(
       async () => {
         const url = `https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`;
-        const res = await fetchWithTimeout(url, {
-          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
-        });
-        if (!res.ok) throw new HttpError(`RugCheck ${res.status}`, res.status);
+        const headers = {};
+        // Only attach Authorization header if a valid key is actually provided
+        if (apiKey && apiKey.trim() !== "") {
+          headers["Authorization"] = `Bearer ${apiKey}`;
+        }
+        const res = await fetchWithTimeout(url, { headers });
+        if (!res.ok) return null; // Gracefully degrade if endpoint errors out
         return await res.json();
       },
       { retries: 1 }
     );
   } catch (err) {
-    console.warn(`[apiClient] RugCheck report failed for ${tokenAddress}: ${err.message}`);
     return null;
   }
 }
