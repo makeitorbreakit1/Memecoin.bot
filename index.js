@@ -1,4 +1,4 @@
-console.log("🚀 SOLANA TRACKER V4 - FREE SNIPER BUILD 2026-09-10");
+console.log("🚀 SOLANA TRACKER V5 - HOLDER INTELLIGENCE + FREE SNIPER BUILD 2026-09-10");
 "use strict";
 
 require("dotenv").config();
@@ -75,14 +75,14 @@ async function registerCommands() {
 
 let watchlist;
 
-async function postAlert(snapshot, result, rugAssessment, earlySignal = null) {
+async function postAlert(snapshot, result, rugAssessment, earlySignal = null, behavior = null) {
   const channel = await client.channels.fetch(CHANNEL_ID).catch((err) => {
     console.error("[postAlert] Channel fetch failed:", err.message);
     return null;
   });
   if (!channel?.send) return;
 
-  const embed = buildRadarEmbed(snapshot, result, rugAssessment, earlySignal);
+  const embed = buildRadarEmbed(snapshot, result, rugAssessment, earlySignal, behavior);
   const content = result.score >= 70 && PING_ROLE_ID ? `<@&${PING_ROLE_ID}>` : undefined;
 
   await channel.send({ content, embeds: [embed] }).catch((err) => {
@@ -141,7 +141,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  const embed = buildRadarEmbed(evaluation.snapshot, evaluation.result, evaluation.rugAssessment, null);
+  const embed = buildRadarEmbed(evaluation.snapshot, evaluation.result, evaluation.rugAssessment, null, evaluation);
   await interaction.editReply({ embeds: [embed] });
 });
 
