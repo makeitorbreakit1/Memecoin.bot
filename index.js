@@ -1,3 +1,8 @@
+
+// Chain/address routing helper.
+function isRobinhoodAddress(address) {
+  return /^0x[a-fA-F0-9]{40}$/.test(String(address || "").trim());
+}
 console.log("🚀 MEME RADAR V6 - SOLANA + ROBINHOOD CHAIN - BUILD 2026-09-10");
 "use strict";
 
@@ -93,7 +98,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === "radar") {
       if (!solanaWatchlist) return interaction.editReply("Solana radar is still starting up.");
       const address = interaction.options.getString("address", true).trim();
-      const e = await solanaWatchlist.evaluateOne(address);
+      const e = await (isRobinhoodAddress(address) ? robinhoodWatchlist : solanaWatchlist).evaluateOne(address);
       if (!e) return interaction.editReply("Couldn't build a usable Solana snapshot.");
       return interaction.editReply({ embeds: [buildRadarEmbed(e.snapshot, e.result, e.rugAssessment, null, e)] });
     }
