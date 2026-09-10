@@ -5,7 +5,7 @@
  * ------------------------------------------------------------------
  * Merges DexScreener, Birdeye, Helius RPC, and RugCheck responses 
  * into a normalized TokenSnapshot covering all 12 tracked metrics 
- * with robust null fallback protection.
+ * with fault-tolerant fallbacks.
  * ------------------------------------------------------------------
  */
 
@@ -60,10 +60,16 @@ async function buildSnapshot(tokenAddress, keys = {}) {
 
   const pair = pickBestPair(pairs);
 
+  // Parse top holders safely from RugCheck report if available
   const topHolders = rugCheck?.topHolders ?? [];
   const insiderHoldings = topHolders
     .filter(h => h.insider || h.owner === rugCheck?.creator)
     .reduce((sum, h) => sum + Number(h.pct || 0), 0);
+
+  // Fallback checks for bundle detection across risk flags or explicit properties
+  const risks = Array.isArray(rugCheck?.risks) ? rugCheck.risks : [];
+  const hasBundleRisk = risks.some(r => r?.name?.toLowerCase().includes("bundle") || r?.description?.toLowerCase().includes("bundle"));
+  const bundleDetected = rugCheck?.bundler ? true : (hasBundleRisk ? "Detected" : null);
 
   const snapshot = {
     tokenAddress,
@@ -86,9 +92,9 @@ async function buildSnapshot(tokenAddress, keys = {}) {
         : null,
 
     holders: birdeye?.holderCount ?? rugCheck?.holderCount ?? null,
-    uniqueWallets: birdeyeHolders?.total ?? null,
-    bundleData: rugCheck?.bundler ? true : (rugCheck?.risks?.some(r => r.name?.toLowerCase().includes("bundle")) ? "Detected" : null),
-    devHoldingsPct: rugCheck?.creatorBalancePct ?? null,
+    uniqueWallets: birdeyeHolders?.total ?? birdeyeHolders?.items?.length ?? null,
+    bundleData: bundleDetected,
+    devHoldingsPct: rugCheck?.creatorBalancePct ?? rugCheck?.creatorPercentage ?? null,
     insiderHoldingsPct: insiderHoldings > 0 ? insiderHoldings : (rugCheck?.insiderPercentage ?? null),
 
     priceChange5m: pair?.priceChange?.m5 ?? null,
