@@ -1,0 +1,17 @@
+{
+  "name": "solana-memecoin-radar-bot",
+  "version": "6.2.0",
+  "description": "Solana memecoin Discord radar using DexScreener, Helius standard RPC, and RugCheck.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
