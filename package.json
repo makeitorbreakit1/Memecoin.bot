@@ -1,14 +1,18 @@
 {
-  "name": "solana-tracker-bot",
-  "version": "2.0.0",
-  "description": "Robust Solana memecoin radar bot for Discord/Railway with 12-field market, activity and safety coverage",
+  "name": "token-radar-bot",
+  "version": "6.0.0",
+  "description": "Multi-chain Discord token radar with Solana holder intelligence and Helius rate-limit protection",
   "main": "index.js",
-  "scripts": { "start": "node index.js" },
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
     "node-fetch": "^2.7.0",
     "p-limit": "^3.1.0"
   },
-  "engines": { "node": ">=18.0.0" }
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
