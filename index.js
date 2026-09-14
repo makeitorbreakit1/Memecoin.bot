@@ -1,5 +1,5 @@
 console.log(
-  "🚀 SOLANA MEMECOIN RADAR V6.3 - HIGH QUALITY ALERT MODE"
+  "🚀 SOLANA MEMECOIN RADAR V6.4 - SOLSCAN HOLDERS + HIGH QUALITY ALERTS"
 );
 
 "use strict";
@@ -27,10 +27,9 @@ const {
   DISCORD_TOKEN,
   CHANNEL_ID,
   HELIUS_API_KEY,
+  SOLSCAN_API_KEY,
   RPC_URL,
   RUGCHECK_API_KEY,
-  PING_ROLE_ID,
-
   POLL_INTERVAL_MS =
     "30000",
 
@@ -59,22 +58,27 @@ const {
     "true",
 
   MAX_ALERTS_PER_CYCLE =
-    "2",
+    "1",
 
   MAX_ALERTS_PER_HOUR =
-    "6",
+    "3",
 } = process.env;
 
 // -----------------------------------------------------------------------------
 // REQUIRED VARIABLES
 // -----------------------------------------------------------------------------
 
-for (const key of [
-  "DISCORD_TOKEN",
-  "CHANNEL_ID",
-  "HELIUS_API_KEY",
-]) {
-  if (!process.env[key]) {
+for (
+  const key of [
+    "DISCORD_TOKEN",
+    "CHANNEL_ID",
+    "HELIUS_API_KEY",
+    "SOLSCAN_API_KEY",
+  ]
+) {
+  if (
+    !process.env[key]
+  ) {
     console.error(
       `[startup] Missing required env var: ${key}`
     );
@@ -91,7 +95,9 @@ const client =
   new Client({
     intents: [
       GatewayIntentBits.Guilds,
+
       GatewayIntentBits.GuildMessages,
+
       GatewayIntentBits.MessageContent,
     ],
   });
@@ -109,11 +115,15 @@ const radarCommand =
     .addStringOption(
       (opt) =>
         opt
-          .setName("address")
+          .setName(
+            "address"
+          )
           .setDescription(
             "Solana token mint address"
           )
-          .setRequired(true)
+          .setRequired(
+            true
+          )
     );
 
 // -----------------------------------------------------------------------------
@@ -121,13 +131,16 @@ const radarCommand =
 // -----------------------------------------------------------------------------
 
 async function registerCommands() {
-  if (!client.application?.id) {
+  if (
+    !client.application?.id
+  ) {
     return;
   }
 
   const rest =
     new REST({
-      version: "10",
+      version:
+        "10",
     }).setToken(
       DISCORD_TOKEN
     );
@@ -169,7 +182,9 @@ async function runRadar(
   address,
   reply
 ) {
-  if (!watchlist) {
+  if (
+    !watchlist
+  ) {
     return reply(
       "Radar is still starting up. Try again in a few seconds."
     );
@@ -180,7 +195,9 @@ async function runRadar(
       address
     );
 
-  if (!evaluation) {
+  if (
+    !evaluation
+  ) {
     return reply(
       "Couldn't find a usable Solana DEX pair for that mint address."
     );
@@ -215,7 +232,9 @@ async function postAlert(
 ) {
   const channel =
     await client.channels
-      .fetch(CHANNEL_ID)
+      .fetch(
+        CHANNEL_ID
+      )
       .catch(
         (err) => {
           console.error(
@@ -242,15 +261,11 @@ async function postAlert(
       behavior
     );
 
-  const content =
-    result.score >= 78 &&
-    PING_ROLE_ID
-      ? `<@&${PING_ROLE_ID}>`
-      : undefined;
-
+  /*
+   * No role ping.
+   */
   await channel
     .send({
-      content,
       embeds: [
         embed,
       ],
@@ -334,6 +349,9 @@ client.once(
         heliusApiKey:
           HELIUS_API_KEY,
 
+        solscanApiKey:
+          SOLSCAN_API_KEY,
+
         rpcUrl:
           RPC_URL ||
           `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`,
@@ -371,11 +389,19 @@ client.once(
       `[startup] Alert limits: ${MAX_ALERTS_PER_CYCLE} per cycle, ${MAX_ALERTS_PER_HOUR} per hour`
     );
 
+    console.log(
+      "[startup] Holder data: Solscan v2 token holders"
+    );
+
     const shutdown =
       () => {
         stopPolling();
+
         client.destroy();
-        process.exit(0);
+
+        process.exit(
+          0
+        );
       };
 
     process.once(
@@ -441,7 +467,8 @@ client.on(
 
     const content =
       String(
-        message.content || ""
+        message.content ||
+        ""
       ).trim();
 
     const match =
@@ -509,6 +536,8 @@ client
         err.message
       );
 
-      process.exit(1);
+      process.exit(
+        1
+      );
     }
   );
