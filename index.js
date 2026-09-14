@@ -1,5 +1,5 @@
 console.log(
-  "🚀 SOLANA MEMECOIN RADAR V6.4 - SOLSCAN HOLDERS + HIGH QUALITY ALERTS"
+  "🚀 SOLANA MEMECOIN RADAR V6.5 - FREE SOLSCAN HOLDERS + HIGH QUALITY MODE"
 );
 
 "use strict";
@@ -30,6 +30,7 @@ const {
   SOLSCAN_API_KEY,
   RPC_URL,
   RUGCHECK_API_KEY,
+
   POLL_INTERVAL_MS =
     "30000",
 
@@ -103,12 +104,14 @@ const client =
   });
 
 // -----------------------------------------------------------------------------
-// SLASH COMMAND
+// COMMAND
 // -----------------------------------------------------------------------------
 
 const radarCommand =
   new SlashCommandBuilder()
-    .setName("radar")
+    .setName(
+      "radar"
+    )
     .setDescription(
       "Run a Solana memecoin radar check"
     )
@@ -125,10 +128,6 @@ const radarCommand =
             true
           )
     );
-
-// -----------------------------------------------------------------------------
-// COMMAND REGISTRATION
-// -----------------------------------------------------------------------------
 
 async function registerCommands() {
   if (
@@ -175,7 +174,7 @@ async function registerCommands() {
 let watchlist;
 
 // -----------------------------------------------------------------------------
-// SINGLE RADAR COMMAND
+// MANUAL RADAR
 // -----------------------------------------------------------------------------
 
 async function runRadar(
@@ -220,7 +219,7 @@ async function runRadar(
 }
 
 // -----------------------------------------------------------------------------
-// DISCORD ALERT
+// ALERT
 // -----------------------------------------------------------------------------
 
 async function postAlert(
@@ -390,7 +389,11 @@ client.once(
     );
 
     console.log(
-      "[startup] Holder data: Solscan v2 token holders"
+      "[startup] Holder count: Solscan FREE token meta"
+    );
+
+    console.log(
+      "[startup] Top-holder safety: RugCheck"
     );
 
     const shutdown =
@@ -468,7 +471,7 @@ client.on(
     const content =
       String(
         message.content ||
-        ""
+          ""
       ).trim();
 
     const match =
@@ -476,7 +479,9 @@ client.on(
         /^\.radar(?:\s+)(\S+)$/i
       );
 
-    if (!match) {
+    if (
+      !match
+    ) {
       return;
     }
 
@@ -491,7 +496,7 @@ client.on(
 );
 
 // -----------------------------------------------------------------------------
-// ERROR HANDLERS
+// ERRORS
 // -----------------------------------------------------------------------------
 
 process.on(
