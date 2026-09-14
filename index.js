@@ -31,55 +31,40 @@ const {
   RPC_URL,
   RUGCHECK_API_KEY,
 
-  POLL_INTERVAL_MS =
-    "30000",
+  POLL_INTERVAL_MS = "30000",
 
-  MIN_TOKEN_AGE_SECONDS =
-    "60",
+  MIN_TOKEN_AGE_SECONDS = "60",
 
-  MAX_TOKEN_AGE_SECONDS =
-    "21600",
+  MAX_TOKEN_AGE_SECONDS = "21600",
 
-  MIN_SCORE_TO_ALERT =
-    "78",
+  MIN_SCORE_TO_ALERT = "78",
 
-  MIN_VERIFICATION_CONFIDENCE_PCT =
-    "88",
+  MIN_VERIFICATION_CONFIDENCE_PCT = "88",
 
-  MAX_RUG_PROBABILITY_PCT =
-    "20",
+  MAX_RUG_PROBABILITY_PCT = "20",
 
-  MIN_LIQUIDITY_USD =
-    "15000",
+  MIN_LIQUIDITY_USD = "15000",
 
-  REQUIRE_RUGCHECK =
-    "true",
+  REQUIRE_RUGCHECK = "true",
 
-  REQUIRE_AUTHORITY_DATA =
-    "true",
+  REQUIRE_AUTHORITY_DATA = "true",
 
-  MAX_ALERTS_PER_CYCLE =
-    "1",
+  MAX_ALERTS_PER_CYCLE = "1",
 
-  MAX_ALERTS_PER_HOUR =
-    "3",
+  MAX_ALERTS_PER_HOUR = "3",
 } = process.env;
 
 // -----------------------------------------------------------------------------
 // REQUIRED VARIABLES
 // -----------------------------------------------------------------------------
 
-for (
-  const key of [
-    "DISCORD_TOKEN",
-    "CHANNEL_ID",
-    "HELIUS_API_KEY",
-    "SOLSCAN_API_KEY",
-  ]
-) {
-  if (
-    !process.env[key]
-  ) {
+for (const key of [
+  "DISCORD_TOKEN",
+  "CHANNEL_ID",
+  "HELIUS_API_KEY",
+  "SOLSCAN_API_KEY",
+]) {
+  if (!process.env[key]) {
     console.error(
       `[startup] Missing required env var: ${key}`
     );
@@ -92,57 +77,45 @@ for (
 // DISCORD
 // -----------------------------------------------------------------------------
 
-const client =
-  new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-
-      GatewayIntentBits.GuildMessages,
-
-      GatewayIntentBits.MessageContent,
-    ],
-  });
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+});
 
 // -----------------------------------------------------------------------------
-// COMMAND
+// SLASH COMMAND
 // -----------------------------------------------------------------------------
 
 const radarCommand =
   new SlashCommandBuilder()
-    .setName(
-      "radar"
-    )
+    .setName("radar")
     .setDescription(
       "Run a Solana memecoin radar check"
     )
-    .addStringOption(
-      (opt) =>
-        opt
-          .setName(
-            "address"
-          )
-          .setDescription(
-            "Solana token mint address"
-          )
-          .setRequired(
-            true
-          )
+    .addStringOption((opt) =>
+      opt
+        .setName("address")
+        .setDescription(
+          "Solana token mint address"
+        )
+        .setRequired(true)
     );
 
+// -----------------------------------------------------------------------------
+// COMMAND REGISTRATION
+// -----------------------------------------------------------------------------
+
 async function registerCommands() {
-  if (
-    !client.application?.id
-  ) {
+  if (!client.application?.id) {
     return;
   }
 
-  const rest =
-    new REST({
-      version:
-        "10",
-    }).setToken(
-      DISCORD_TOKEN
-    );
+  const rest = new REST({
+    version: "10",
+  }).setToken(DISCORD_TOKEN);
 
   try {
     await rest.put(
@@ -174,16 +147,14 @@ async function registerCommands() {
 let watchlist;
 
 // -----------------------------------------------------------------------------
-// MANUAL RADAR
+// MANUAL RADAR CHECK
 // -----------------------------------------------------------------------------
 
 async function runRadar(
   address,
   reply
 ) {
-  if (
-    !watchlist
-  ) {
+  if (!watchlist) {
     return reply(
       "Radar is still starting up. Try again in a few seconds."
     );
@@ -194,9 +165,7 @@ async function runRadar(
       address
     );
 
-  if (
-    !evaluation
-  ) {
+  if (!evaluation) {
     return reply(
       "Couldn't find a usable Solana DEX pair for that mint address."
     );
@@ -212,14 +181,12 @@ async function runRadar(
     );
 
   return reply({
-    embeds: [
-      embed,
-    ],
+    embeds: [embed],
   });
 }
 
 // -----------------------------------------------------------------------------
-// ALERT
+// DISCORD ALERT
 // -----------------------------------------------------------------------------
 
 async function postAlert(
@@ -231,23 +198,17 @@ async function postAlert(
 ) {
   const channel =
     await client.channels
-      .fetch(
-        CHANNEL_ID
-      )
-      .catch(
-        (err) => {
-          console.error(
-            "[postAlert] Channel fetch failed:",
-            err.message
-          );
+      .fetch(CHANNEL_ID)
+      .catch((err) => {
+        console.error(
+          "[postAlert] Channel fetch failed:",
+          err.message
+        );
 
-          return null;
-        }
-      );
+        return null;
+      });
 
-  if (
-    !channel?.send
-  ) {
+  if (!channel?.send) {
     return;
   }
 
@@ -265,18 +226,14 @@ async function postAlert(
    */
   await channel
     .send({
-      embeds: [
-        embed,
-      ],
+      embeds: [embed],
     })
-    .catch(
-      (err) => {
-        console.error(
-          "[postAlert] Send failed:",
-          err.message
-        );
-      }
-    );
+    .catch((err) => {
+      console.error(
+        "[postAlert] Send failed:",
+        err.message
+      );
+    });
 }
 
 // -----------------------------------------------------------------------------
@@ -309,6 +266,11 @@ client.once(
             MIN_SCORE_TO_ALERT
           ),
 
+        /*
+         * Cheap filter:
+         * lets reasonably strong candidates continue to
+         * the more expensive full checks.
+         */
         cheapFilterScore:
           65,
 
@@ -402,9 +364,7 @@ client.once(
 
         client.destroy();
 
-        process.exit(
-          0
-        );
+        process.exit(0);
       };
 
     process.once(
@@ -420,7 +380,7 @@ client.once(
 );
 
 // -----------------------------------------------------------------------------
-// INTERACTIONS
+// SLASH COMMAND INTERACTION
 // -----------------------------------------------------------------------------
 
 client.on(
@@ -470,8 +430,7 @@ client.on(
 
     const content =
       String(
-        message.content ||
-          ""
+        message.content || ""
       ).trim();
 
     const match =
@@ -479,24 +438,20 @@ client.on(
         /^\.radar(?:\s+)(\S+)$/i
       );
 
-    if (
-      !match
-    ) {
+    if (!match) {
       return;
     }
 
     await runRadar(
       match[1],
       (payload) =>
-        message.reply(
-          payload
-        )
+        message.reply(payload)
     );
   }
 );
 
 // -----------------------------------------------------------------------------
-// ERRORS
+// ERROR HANDLERS
 // -----------------------------------------------------------------------------
 
 process.on(
@@ -531,18 +486,12 @@ client.on(
 // -----------------------------------------------------------------------------
 
 client
-  .login(
-    DISCORD_TOKEN
-  )
-  .catch(
-    (err) => {
-      console.error(
-        "[startup] Failed to log in:",
-        err.message
-      );
+  .login(DISCORD_TOKEN)
+  .catch((err) => {
+    console.error(
+      "[startup] Failed to log in:",
+      err.message
+    );
 
-      process.exit(
-        1
-      );
-    }
-  );
+    process.exit(1);
+  });
